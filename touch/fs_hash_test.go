@@ -21,10 +21,10 @@ func TestHashString(t *testing.T) {
 }
 
 func TestHashInputs(t *testing.T) {
-	a := []referenceframe.Input{{5}, {7}}
-	b := []referenceframe.Input{{5.0001}, {7.0001}}
-	c := []referenceframe.Input{{5.1}, {7.1}}
-	d := []referenceframe.Input{{7}, {5}}
+	a := []referenceframe.Input{5, 7}
+	b := []referenceframe.Input{5.0001, 7.0001}
+	c := []referenceframe.Input{5.1, 7.1}
+	d := []referenceframe.Input{7, 5}
 
 	test.That(t, HashInputs(a), test.ShouldEqual, HashInputs(a))
 	test.That(t, HashInputs(a), test.ShouldEqual, HashInputs(b))

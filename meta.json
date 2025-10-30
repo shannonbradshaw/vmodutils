@@ -45,6 +45,10 @@
     {
         "api": "rdk:service:vision",
         "model": "erh:vmodutils:pc-cluster"
+    },
+    {
+         "api": "rdk:component:camera",
+        "model": "erh:vmodutils:pc-look-at-crop-camera"
     }
   ],
   "applications": null,
