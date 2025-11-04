@@ -97,6 +97,8 @@ func newArmPositionSaver(ctx context.Context, deps resource.Dependencies, config
 			}
 			aps.visionServices = append(aps.visionServices, v)
 		}
+	}
+
 	aps.fsSvc, err = framesystem.FromDependencies(deps)
 	if err != nil {
 		return nil, err
@@ -116,7 +118,7 @@ type ArmPositionSaver struct {
 	arm            arm.Arm
 	motion         motion.Service
 	visionServices []vision.Service
-	fsSvc  framesystem.Service
+	fsSvc          framesystem.Service
 }
 
 func (aps *ArmPositionSaver) Name() resource.Name {
