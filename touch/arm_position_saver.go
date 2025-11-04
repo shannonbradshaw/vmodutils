@@ -83,7 +83,7 @@ func newArmPositionSaver(ctx context.Context, deps resource.Dependencies, config
 		}
 	}
 
-	aps.fsSvc, err = resource.FromProvider[framesystem.Service](deps, framesystem.PublicServiceName)
+	aps.fsSvc, err = framesystem.FromDependencies(deps)
 	if err != nil {
 		return nil, err
 	}
