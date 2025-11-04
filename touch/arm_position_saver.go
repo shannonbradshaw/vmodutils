@@ -10,7 +10,6 @@ import (
 	"go.viam.com/rdk/components/arm"
 	toggleswitch "go.viam.com/rdk/components/switch"
 	"go.viam.com/rdk/logging"
-	"go.viam.com/rdk/motionplan/armplanning"
 	"go.viam.com/rdk/referenceframe"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/services/motion"
@@ -216,7 +215,7 @@ func (aps *ArmPositionSaver) goToSavePosition(ctx context.Context) error {
 			// Express the goal state in joint positions
 			goalFrameSystemInputs := make(referenceframe.FrameSystemInputs)
 			goalFrameSystemInputs[aps.arm.Name().Name] = aps.cfg.Joints
-			extra := map[string]any{"goal_state": armplanning.NewPlanState(nil, goalFrameSystemInputs).Serialize()}
+			extra := map[string]any{"goal_state": serialize(goalFrameSystemInputs)}
 
 			// Call Motion.Move
 			_, err = aps.motion.Move(ctx, motion.MoveReq{
@@ -281,4 +280,14 @@ func (aps *ArmPositionSaver) goToSavePosition(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("need to configure where to go")
+}
+
+func serialize(inputs referenceframe.FrameSystemInputs) map[string]any {
+	m := map[string]interface{}{}
+	confMap := map[string]interface{}{}
+	for fName, input := range inputs {
+		confMap[fName] = input
+	}
+	m["configuration"] = confMap
+	return m
 }
