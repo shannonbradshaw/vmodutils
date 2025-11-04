@@ -20,6 +20,7 @@ func main() {
 		resource.APIModel{gripper.API, touch.ObstacleModel},
 		resource.APIModel{gripper.API, touch.ObstacleOpenBoxModel},
 		resource.APIModel{vision.API, touch.ClusterModel},
+		resource.APIModel{vision.API, touch.LookAtCameraModel},
 	)
 
 }

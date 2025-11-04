@@ -4,9 +4,9 @@ go 1.25.1
 
 require (
 	github.com/golang/geo v0.0.0-20230421003525-6adc56603217
-	go.viam.com/rdk v0.98.1-0.20251023194042-e97069d07515
+	go.viam.com/rdk v0.99.0
 	go.viam.com/test v1.2.4
-	go.viam.com/utils v0.1.174
+	go.viam.com/utils v0.1.176
 	neilpa.me/go-stl v0.5.0
 )
 

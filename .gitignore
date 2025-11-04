@@ -1,3 +1,5 @@
+.DS_Store
 *~
 bin/
 module.tar.gz
+touch/foo.pcd
