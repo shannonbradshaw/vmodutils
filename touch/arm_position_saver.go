@@ -12,6 +12,7 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/referenceframe"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/robot/framesystem"
 	"go.viam.com/rdk/services/motion"
 	"go.viam.com/rdk/spatialmath"
 	"go.viam.com/rdk/utils"
@@ -82,6 +83,11 @@ func newArmPositionSaver(ctx context.Context, deps resource.Dependencies, config
 		}
 	}
 
+	aps.fsSvc, err = resource.FromProvider[framesystem.Service](deps, framesystem.PublicServiceName)
+	if err != nil {
+		return nil, err
+	}
+
 	return aps, nil
 }
 
@@ -95,6 +101,7 @@ type ArmPositionSaver struct {
 
 	arm    arm.Arm
 	motion motion.Service
+	fsSvc  framesystem.Service
 }
 
 func (aps *ArmPositionSaver) Name() resource.Name {
@@ -156,7 +163,7 @@ func (aps *ArmPositionSaver) saveCurrentPosition(ctx context.Context) error {
 
 		newConfig["joints"] = inputs
 	} else {
-		p, err := aps.motion.GetPose(ctx, aps.cfg.Arm, "world", nil, nil)
+		p, err := aps.fsSvc.GetPose(ctx, aps.cfg.Arm, "world", nil, nil)
 		if err != nil {
 			return err
 		}
@@ -173,7 +180,7 @@ func (aps *ArmPositionSaver) goToSavePosition(ctx context.Context) error {
 	}
 
 	if aps.motion != nil {
-		current, err := aps.motion.GetPose(ctx, aps.cfg.Arm, "world", nil, nil)
+		current, err := aps.fsSvc.GetPose(ctx, aps.cfg.Arm, "world", nil, nil)
 		if err != nil {
 			return err
 		}
