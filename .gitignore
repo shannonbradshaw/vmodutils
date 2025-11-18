@@ -3,3 +3,4 @@
 bin/
 module.tar.gz
 touch/foo.pcd
+reload-*
