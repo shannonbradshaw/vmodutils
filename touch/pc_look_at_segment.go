@@ -14,7 +14,6 @@ import (
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
 	"go.viam.com/rdk/rimage"
-	"go.viam.com/rdk/robot"
 	"go.viam.com/rdk/spatialmath"
 
 	"github.com/erh/vmodutils"
@@ -59,11 +58,6 @@ func newLookAtCamera(ctx context.Context, deps resource.Dependencies, config res
 		return nil, err
 	}
 
-	cc.client, err = vmodutils.ConnectToMachineFromEnv(ctx, logger)
-	if err != nil {
-		return nil, err
-	}
-
 	return cc, nil
 }
 
@@ -74,8 +68,7 @@ type lookAtCamera struct {
 	cfg    *LookAtCameraConfig
 	logger logging.Logger
 
-	src    camera.Camera
-	client robot.Robot
+	src camera.Camera
 
 	lock               sync.Mutex
 	active             bool
@@ -178,6 +171,10 @@ func (cc *lookAtCamera) doNextPointCloud(ctx context.Context, extra map[string]i
 		return nil, err
 	}
 
+	start := time.Now()
+	defer func() {
+		cc.logger.Infof("PCLookAtSegment took %v", time.Since(start))
+	}()
 	return PCLookAtSegment(pc)
 }
 
@@ -188,7 +185,7 @@ func (cc *lookAtCamera) Properties(ctx context.Context) (camera.Properties, erro
 }
 
 func (cc *lookAtCamera) Close(ctx context.Context) error {
-	return cc.client.Close(ctx)
+	return nil
 }
 
 func (cc *lookAtCamera) Geometries(ctx context.Context, _ map[string]interface{}) ([]spatialmath.Geometry, error) {
