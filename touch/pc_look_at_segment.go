@@ -195,35 +195,22 @@ func (cc *lookAtCamera) Geometries(ctx context.Context, _ map[string]interface{}
 	return nil, nil
 }
 
-func addRecursive(t *pointcloud.BasicOctree, start r3.Vector, good pointcloud.PointCloud, radius float64) error {
-	close, err := t.PointsWithinRadius(start, 5)
-	if err != nil {
-		return err
-	}
-	for _, c := range close {
-		_, got := good.At(c.X, c.Y, c.Z)
-		if got {
-			continue
-		}
-		d, got := t.At(c.X, c.Y, c.Z)
-		if !got {
-			fmt.Printf("how is this possible\n")
-			continue
-		}
-		good.Set(c, d)
-		err = addRecursive(t, c, good, radius)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func PCLookAtSegment(pc pointcloud.PointCloud) (pointcloud.PointCloud, error) {
 
-	t, err := pointcloud.ToBasicOctree(pc, 1)
-	if err != nil {
-		return nil, err
+	type data struct {
+		p r3.Vector
+		d pointcloud.Data
+	}
+
+	bucketSize := 5.0
+	buckets := map[string]pointcloud.PointCloud{}
+
+	hash := func(p r3.Vector) string {
+		return fmt.Sprintf("%d-%d-%d",
+			int(p.X/bucketSize),
+			int(p.Y/bucketSize),
+			int(p.Z/bucketSize),
+		)
 	}
 
 	var best r3.Vector
@@ -237,15 +224,88 @@ func PCLookAtSegment(pc pointcloud.PointCloud) (pointcloud.PointCloud, error) {
 			distanceFromCenter = myD
 			best = p
 		}
+
+		bucket := hash(p)
+
+		x, ok := buckets[bucket]
+		if !ok {
+			x = pointcloud.NewBasicEmpty()
+			buckets[bucket] = x
+		}
+		x.Set(p, d)
+
 		return true
 	})
 
 	good := pointcloud.NewBasicEmpty()
+	goodBucket, ok := buckets[hash(best)]
+	if !ok {
+		panic(1)
+	}
+	goodBucket.Iterate(0, 0, func(p r3.Vector, d pointcloud.Data) bool {
+		good.Set(p, d)
+		return true
+	})
 
-	err = addRecursive(t, best, good, 5)
-	if err != nil {
-		return nil, err
+	for {
+		added := false
+
+		for hash, b := range buckets {
+			if b.Size() == 0 {
+				continue
+			}
+			d := minEstimateDisance(good, b)
+			if d > bucketSize*2 {
+				continue
+			}
+
+			x := pointcloud.NewBasicEmpty()
+
+			b.Iterate(0, 0, func(p r3.Vector, d pointcloud.Data) bool {
+				if isWithin(p, good, bucketSize) {
+					added = true
+					good.Set(p, d)
+				} else {
+					x.Set(p, d)
+				}
+				return true
+			})
+
+			buckets[hash] = x
+		}
+
+		if !added {
+			break
+		}
+
 	}
 
 	return good, nil
+}
+
+func isWithin(look r3.Vector, pc pointcloud.PointCloud, distance float64) bool {
+	md := pc.MetaData()
+
+	dx := math.Max(0, math.Max(md.MinX-look.X, look.X-md.MaxX))
+	dy := math.Max(0, math.Max(md.MinY-look.Y, look.Y-md.MaxY))
+	dz := math.Max(0, math.Max(md.MinZ-look.Z, look.Z-md.MaxZ))
+
+	return math.Sqrt(dx*dx+dy*dy+dz*dz) < distance
+}
+
+// takes 2 pointclouds, and figures out the the closest possible distance by just looking at the edges as defined by max and min
+func minEstimateDisance(a, b pointcloud.PointCloud) float64 {
+	if a.Size() == 0 || b.Size() == 0 {
+		return math.Inf(1)
+	}
+
+	amd := a.MetaData()
+	bmd := b.MetaData()
+
+	// Calculate the minimum distance between two axis-aligned bounding boxes
+	dx := math.Max(0, math.Max(amd.MinX-bmd.MaxX, bmd.MinX-amd.MaxX))
+	dy := math.Max(0, math.Max(amd.MinY-bmd.MaxY, bmd.MinY-amd.MaxY))
+	dz := math.Max(0, math.Max(amd.MinZ-bmd.MaxZ, bmd.MinZ-amd.MaxZ))
+
+	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
