@@ -2,7 +2,6 @@ package touch
 
 import (
 	"context"
-	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -180,14 +179,15 @@ func PCToImage(pc pointcloud.PointCloud) image.Image {
 
 	img := image.NewRGBA(r)
 
-	bestZ := map[string]float64{}
+	bestZ := make([]float64, xScale*yScale) //map[int]float64{}
 
 	pc.Iterate(0, 0, func(p r3.Vector, d pointcloud.Data) bool {
 		x := int(p.X) + xScale
 		y := int(p.Y) + yScale
 
-		key := fmt.Sprintf("%d-%d", x, y)
-		oldZ, ok := bestZ[key]
+		key := (y * yScale) + x
+		oldZ := bestZ[key]
+		ok := oldZ != 0
 		if ok {
 			if p.Z < oldZ {
 				return true

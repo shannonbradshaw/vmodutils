@@ -122,6 +122,19 @@ func TestPCProject1(t *testing.T) {
 
 }
 
+func BenchmarkPCProject1(t *testing.B) {
+	in, err := pointcloud.NewFromFile("data/cup1.pcd", "")
+	test.That(t, err, test.ShouldBeNil)
+
+	PCToImage(in)
+
+	t.ResetTimer()
+
+	for range t.N {
+		PCToImage(in)
+	}
+}
+
 func TestPCStats(t *testing.T) {
 	in, err := pointcloud.NewFromFile("data/cup2onlycup.pcd", "")
 	test.That(t, err, test.ShouldBeNil)
