@@ -14,7 +14,17 @@
   "min" : { "X" : 9, "Y" : 9, "Z" : 9}  // specified in world frame
 }
   
+``
+
+## pc detect crop camera
 ```
+{
+  "src" : "<cam>",
+  "service" : "<vision service>"
+}
+  
+```
+
 ## pc merge
 ```
 {

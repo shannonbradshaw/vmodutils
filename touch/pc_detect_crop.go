@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"image"
+	"time"
 
 	"github.com/golang/geo/r3"
 
 	"go.viam.com/rdk/components/camera"
+	"go.viam.com/rdk/data"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/pointcloud"
 	"go.viam.com/rdk/resource"
+	"go.viam.com/rdk/rimage"
 	"go.viam.com/rdk/services/vision"
+	"go.viam.com/rdk/spatialmath"
 	"go.viam.com/rdk/vision/objectdetection"
 
 	"github.com/erh/vmodutils"
@@ -49,6 +53,7 @@ func (dccc *DetectCropCameraConfig) Validate(path string) ([]string, []string, e
 
 type detectCropCamera struct {
 	resource.AlwaysRebuild
+	resource.TriviallyCloseable
 
 	name   resource.Name
 	cfg    *DetectCropCameraConfig
@@ -56,6 +61,8 @@ type detectCropCamera struct {
 
 	src     camera.Camera
 	service vision.Service
+
+	props camera.Properties
 }
 
 func newDetectCropCamera(ctx context.Context, deps resource.Dependencies, config resource.Config, logger logging.Logger) (camera.Camera, error) {
@@ -80,16 +87,81 @@ func newDetectCropCamera(ctx context.Context, deps resource.Dependencies, config
 		return nil, err
 	}
 
-	props, err := cc.src.Properties(ctx)
+	cc.props, err = cc.src.Properties(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if props.IntrinsicParams == nil {
+	if cc.props.IntrinsicParams == nil {
 		return nil, fmt.Errorf("no IntrinsicParams on %s", newConf.Src)
 	}
 
-	return nil, fmt.Errorf("finish me")
-	//return cc, nil
+	return cc, nil
+}
+
+func (dcc *detectCropCamera) Name() resource.Name {
+	return dcc.name
+}
+
+func (dcc *detectCropCamera) Properties(ctx context.Context) (camera.Properties, error) {
+	return camera.Properties{
+		SupportsPCD: true,
+	}, nil
+}
+
+func (dcc *detectCropCamera) Geometries(ctx context.Context, _ map[string]interface{}) ([]spatialmath.Geometry, error) {
+	return nil, nil
+}
+
+func (dcc *detectCropCamera) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+	return nil, nil
+}
+
+func (dcc *detectCropCamera) Image(ctx context.Context, mimeType string, extra map[string]interface{}) ([]byte, camera.ImageMetadata, error) {
+	pc, err := dcc.NextPointCloud(ctx, extra)
+	if err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
+	img := PCToImage(pc)
+
+	data, err := rimage.EncodeImage(ctx, img, mimeType)
+	if err != nil {
+		return nil, camera.ImageMetadata{}, err
+	}
+
+	return data, camera.ImageMetadata{MimeType: mimeType}, err
+}
+
+func (dcc *detectCropCamera) Images(ctx context.Context, filterSourceNames []string, extra map[string]interface{}) ([]camera.NamedImage, resource.ResponseMetadata, error) {
+	pc, err := dcc.NextPointCloud(ctx, extra)
+	if err != nil {
+		return nil, resource.ResponseMetadata{}, err
+	}
+	start := time.Now()
+	img := PCToImage(pc)
+	elapsed := time.Since(start)
+	if elapsed > (time.Millisecond * 100) {
+		dcc.logger.Infof("PCToImage took %v", elapsed)
+	}
+	ni, err := camera.NamedImageFromImage(img, "cropped", "image/png", data.Annotations{})
+	if err != nil {
+		return nil, resource.ResponseMetadata{}, err
+	}
+	return []camera.NamedImage{ni}, resource.ResponseMetadata{time.Now()}, nil
+}
+
+func (dcc *detectCropCamera) NextPointCloud(ctx context.Context, extra map[string]interface{}) (pointcloud.PointCloud, error) {
+	// todo: maybe paralllize this
+	pc, err := dcc.src.NextPointCloud(ctx, extra)
+	if err != nil {
+		return nil, err
+	}
+
+	detections, err := dcc.service.DetectionsFromCamera(ctx, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return PCDetectCrop(pc, detections, dcc.props)
 }
 
 func PCDetectCrop(
