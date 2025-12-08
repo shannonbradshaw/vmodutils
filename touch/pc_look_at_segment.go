@@ -3,11 +3,13 @@ package touch
 import (
 	"context"
 	"fmt"
+	"image"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/golang/geo/r3"
+	"github.com/lucasb-eyer/go-colorful"
 
 	"go.viam.com/rdk/components/camera"
 	"go.viam.com/rdk/data"
@@ -32,7 +34,8 @@ func init() {
 }
 
 type LookAtCameraConfig struct {
-	Src string
+	Src      string
+	UseColor bool `json:"use_color"`
 }
 
 func (ccc *LookAtCameraConfig) Validate(path string) ([]string, []string, error) {
@@ -59,6 +62,11 @@ func newLookAtCamera(ctx context.Context, deps resource.Dependencies, config res
 		return nil, err
 	}
 
+	cc.srcProperties, err = cc.src.Properties(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return cc, nil
 }
 
@@ -69,7 +77,8 @@ type lookAtCamera struct {
 	cfg    *LookAtCameraConfig
 	logger logging.Logger
 
-	src camera.Camera
+	src           camera.Camera
+	srcProperties camera.Properties
 
 	lock               sync.Mutex
 	active             bool
@@ -172,10 +181,34 @@ func (cc *lookAtCamera) doNextPointCloud(ctx context.Context, extra map[string]i
 		return nil, err
 	}
 
+	if cc.cfg.UseColor {
+		imgs, _, err := cc.src.Images(ctx, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		img, err := imgs[0].Image(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		box, err := getBoundingBoxBasedOnCenterHSV(img)
+		if err != nil {
+			return nil, err
+		}
+
+		pc, err = PCLimitToImageBoxes(pc, []*image.Rectangle{box}, cc.srcProperties)
+		if err != nil {
+			return nil, err
+		}
+
+	}
+
 	start := time.Now()
 	defer func() {
 		cc.logger.Infof("PCLookAtSegment took %v", time.Since(start))
 	}()
+
 	return PCLookAtSegment(pc)
 }
 
@@ -306,4 +339,80 @@ func minEstimateDisance(a, b pointcloud.PointCloud) float64 {
 	dz := math.Max(0, math.Max(amd.MinZ-bmd.MaxZ, bmd.MinZ-amd.MaxZ))
 
 	return math.Sqrt(dx*dx + dy*dy + dz*dz)
+}
+
+func getBoundingBoxBasedOnCenterHSV(img image.Image) (*image.Rectangle, error) {
+	bounds := img.Bounds()
+
+	centerX := bounds.Min.X + bounds.Dx()/2
+	centerY := bounds.Min.Y + bounds.Dy()/2
+
+	cc, ok := colorful.MakeColor(img.At(centerX, centerY))
+	if !ok {
+		return nil, fmt.Errorf("bad color %v", img.At(centerX, centerY))
+	}
+
+	good, _, _ := cc.Hsv()
+	good = math.Floor(good / 100)
+
+	// Track visited pixels
+	visited := make([][]bool, bounds.Dy())
+	for i := range visited {
+		visited[i] = make([]bool, bounds.Dx())
+	}
+
+	goodRectange := image.Rect(centerX, centerY, centerX, centerY)
+
+	type point struct{ x, y int }
+	queue := []point{{centerX, centerY}}
+
+	hueImg := image.NewRGBA(bounds) // TODO : remove
+
+	for len(queue) > 0 { // BFS from center
+		p := queue[0]
+		queue = queue[1:]
+
+		// Bounds check
+		if p.x < bounds.Min.X || p.x >= bounds.Max.X || p.y < bounds.Min.Y || p.y >= bounds.Max.Y {
+			continue
+		}
+
+		// Already visited check
+		vy, vx := p.y-bounds.Min.Y, p.x-bounds.Min.X
+		if visited[vy][vx] {
+			continue
+		}
+		visited[vy][vx] = true
+
+		// Hue bucket check
+		cc, ok := colorful.MakeColor(img.At(p.x, p.y))
+		if !ok {
+			return nil, fmt.Errorf("bad color %v", img.At(p.x, p.y))
+		}
+		h, _, _ := cc.Hsv()
+		bucket := math.Floor(h / 100)
+		if bucket != good {
+			continue
+		}
+
+		goodRectange.Min.X = min(goodRectange.Min.X, p.x)
+		goodRectange.Min.Y = min(goodRectange.Min.Y, p.y)
+		goodRectange.Max.X = max(goodRectange.Max.X, p.x)
+		goodRectange.Max.Y = max(goodRectange.Max.Y, p.y)
+
+		hueImg.Set(p.x, p.y, colorful.Hsv(bucket*100, 1, 1))
+
+		// Add neighbors
+		queue = append(queue, point{p.x - 1, p.y})
+		queue = append(queue, point{p.x + 1, p.y})
+		queue = append(queue, point{p.x, p.y - 1})
+		queue = append(queue, point{p.x, p.y + 1})
+	}
+
+	err := rimage.SaveImage(hueImg, "temp.png")
+	if err != nil {
+		return nil, err
+	}
+
+	return &goodRectange, nil
 }

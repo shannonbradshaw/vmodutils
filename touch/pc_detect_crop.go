@@ -178,6 +178,14 @@ func PCDetectCrop(
 		boxes = append(boxes, d.BoundingBox())
 	}
 
+	return PCLimitToImageBoxes(pc, boxes, props)
+}
+
+func PCLimitToImageBoxes(
+	pc pointcloud.PointCloud,
+	boxes []*image.Rectangle,
+	props camera.Properties) (pointcloud.PointCloud, error) {
+
 	out := pointcloud.NewBasicEmpty()
 
 	pc.Iterate(0, 0, func(p r3.Vector, d pointcloud.Data) bool {
