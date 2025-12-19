@@ -34,15 +34,50 @@
 ## arm position saver
 ```
 {
-    "arm" : "<name of arm>", // required
-    "motion" : "<name of motion service>", // optional - if used uses post not joines
-    "joints" : [ ], // set automatically
+    // required
+    "arm" : "<name of arm>",
+
+    // optional
+    // if motion and joints are set, uses joint to joint motion via motion.Move
+    // if motion and pose are set, uses cartesian motion via motion.Move
+    // if motion is not set and joints are set, uses arm.MoveToJointPositions
+    "motion" : "<name of motion service>",
+
+    // can be set automatically via SetPosition command
+    "joints" : [ ],
     "point" : < ... >,
-    "orientation" : < ... >
+    "orientation" : < ... >,
+
+    // optional - if set, the Geometry objects in the vision services' GetObjectPointClouds results
+    // are added to the world state passed to the motion service
+    "vision_services": ["<name of vision service>"],
+
+    // optional - options passed as 'extra' to motion.Move or arm.MoveToJointPositions
+    "extra" : "<options>"
 }
 ```
 
+## multi arm position switch
+```
+{
+    // required
+    "arm" : "<name of arm>",
 
+    // optional - if set uses joint to joint motion via motion.Move, if not uses arm.MoveToJointPositions
+    "motion" : "<name of motion service>",
+
+    // list of arm joint positions
+    // the list needs to contain at least one set of joint positions
+    "joints" : [[0, 0, 0, 0, 0, 0], ...],
+
+    // optional - if set, the Geometry objects in the vision services' GetObjectPointClouds results
+    // are added to the world state passed to the motion service
+    "vision_services": ["<name of vision service>"],
+
+    // optional - options passed as 'extra' to motion.Move or arm.MoveToJointPositions
+    "extra" : "<options>"
+}
+```
 
 ## pc multiple arm poses
 ```
