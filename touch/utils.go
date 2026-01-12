@@ -276,10 +276,7 @@ func GetMergedPointCloudFromPositions(ctx context.Context, positions []toggleswi
 
 	// If a traceID is present, we will write files to a traceID sub-directory in the capture directory.
 	// Otherwise, we will write files at the top-level of the capture directory.
-	var traceID string
-	if span := trace.FromContext(ctx); span != nil {
-		traceID = span.SpanContext().TraceID().String()
-	}
+	traceID := getTraceID(ctx)
 
 	for i, p := range positions {
 		err := p.SetPosition(ctx, 2, nil)
@@ -481,10 +478,7 @@ func GetMergedPointCloudFromMultiPositionSwitch(ctx context.Context, s toggleswi
 
 	// If a traceID is present, we will write files to a traceID sub-directory in the capture directory.
 	// Otherwise, we will write files at the top-level of the capture directory.
-	var traceID string
-	if span := trace.FromContext(ctx); span != nil {
-		traceID = span.SpanContext().TraceID().String()
-	}
+	traceID := getTraceID(ctx)
 
 	numPositions, _, err := s.GetNumberOfPositions(ctx, nil)
 	if err != nil {
@@ -540,4 +534,12 @@ func GetMergedPointCloudFromMultiPositionSwitch(ctx context.Context, s toggleswi
 	}
 
 	return big, nil
+}
+
+func getTraceID(ctx context.Context) string {
+	traceID := ""
+	if span := trace.FromContext(ctx); span != nil {
+		traceID = span.SpanContext().TraceID().String()
+	}
+	return traceID
 }
